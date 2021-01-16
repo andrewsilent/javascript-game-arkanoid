@@ -1,0 +1,22 @@
+@import "./reset.css";
+
+#wrapper {
+    min-height: 100vh;
+    background: #333333 url('../textures/bg.jpg') center center no-repeat;
+    /* cursor: none; */
+}
+
+.container {
+    display: flex;
+    justify-content: center;
+    min-width: 100%;
+    min-height: 100vh;
+}
+
+.canvas-wrapper {
+    align-self: center;
+}
+
+.gameCanvas {
+    display: block;
+}
