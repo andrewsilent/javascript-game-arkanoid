@@ -15,6 +15,7 @@ const BRICK_GUTTER = 2;
 const BRICK_WIDTH = (LEVEL_WIDTH / 10 - (BRICK_GUTTER + LEVEL_GUTTER / 10));
 const BRICK_HEIGHT = Math.round(LEVEL_HEIGHT / 30 - BRICK_GUTTER);
 let FPS = 60;
+let mouseX;
 
 class Sound {
     constructor() {
@@ -49,18 +50,19 @@ class Level {
 
     update() {
         if (ball.x - ball.radius < LEVEL_X || ball.x + ball.radius > LEVEL_X + LEVEL_WIDTH) {
-            ball.collisionHorizontal();
+            ball.reflectHorizontal();
             Sound.reflect();
         }
         if (ball.y - ball.radius < LEVEL_Y) {
-            ball.collisionVertical();
+            ball.reflectVertical();
             Sound.reflect();
         }
         if (ball.y - ball.radius > LEVEL_Y + LEVEL_WIDTH) {
             ball.vx = 0;
             ball.vy = 0;
+        }
+        if (ball.y + ball.radius == LEVEL_Y + LEVEL_WIDTH) {
             Sound.lost();
-            window.cancelAnimationFrame();
         }
     }
 
@@ -166,11 +168,11 @@ class BrickType extends Brick {
 
         if (this.type !== 0) {
             if (this.leftImpact() || this.rightImpact()) {
-                ball.collisionHorizontal();
+                ball.reflectHorizontal();
                 this.hit();
             }
             if (this.topImpact() || this.bottomImpact()) {
-                ball.collisionVertical();
+                ball.reflectVertical();
                 this.hit();
             }
         }
@@ -219,11 +221,26 @@ class Player {
     }
 
     update() {
+        this.touchDown();
+        this.movement();
+    }
+
+    touchDown() {
         if (ball.x - ball.radius > this.x && ball.x + ball.radius < this.x + this.width) {
             if (ball.y + ball.radius > this.y) {
-                ball.collisionVertical();
+                ball.reflectVertical();
                 Sound.reflect();
             }
+        }
+    }
+
+    movement() {
+        this.x = mouseX - this.width / 2 || LEVEL_X + (LEVEL_WIDTH / 2) - this.width / 2;
+        if (player.x < LEVEL_X) {
+            player.x = LEVEL_X;
+        }
+        if (player.x + player.width > LEVEL_X + LEVEL_WIDTH) {
+            player.x = LEVEL_X + LEVEL_WIDTH - player.width;
         }
     }
 }
@@ -247,10 +264,10 @@ class Ball {
         this.x = this.x + this.vx;
         this.y = this.y + this.vy;
     }
-    collisionVertical() {
+    reflectVertical() {
         this.vy = -this.vy;
     }
-    collisionHorizontal() {
+    reflectHorizontal() {
         this.vx = -this.vx;
     }
 }
@@ -289,10 +306,14 @@ function render() {
     renderBall();
 }
 
+// function animate() {
+//     setTimeout(function () {
+//         requestAnimationFrame(run);
+//     }, 1000 / FPS);
+// }
+
 function animate() {
-    setTimeout(function () {
-        requestAnimationFrame(run);
-    }, 1000 / FPS);
+    requestAnimationFrame(run);
 }
 
 function renderLevel() {
@@ -466,20 +487,11 @@ function renderBall() {
 
 function mouseAction() {
     document.onmousemove = function (e) {
-        e = e || window.event;
-        if (e.clientX < LEVEL_X) {
-            player.x = LEVEL_X;
-        }
-        if (e.clientX + player.width > LEVEL_X + LEVEL_WIDTH) {
-            player.x = LEVEL_X + LEVEL_WIDTH - player.width;
-        }
-        if ((e.clientX > LEVEL_X) && (e.clientX + player.width < LEVEL_X + LEVEL_WIDTH)) {
-            player.x = e.clientX;
-        }
+        mouseX = e.clientX;
     }
-    canvas.addEventListener('contextmenu', e => {
-        e.preventDefault();
-    });
+    document.oncontextmenu = function () {
+        return false;
+    }
 }
 
 createLevel();
