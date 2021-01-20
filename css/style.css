@@ -15,6 +15,7 @@
 
 .canvas-wrapper {
     align-self: center;
+    position: relative;
 }
 
 .gameCanvas {
