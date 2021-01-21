@@ -1,19 +1,24 @@
-let fps = 60;
-let mouseX;
-const CANVAS_WRAPPER = document.querySelector('.canvas-wrapper');
-const DOCUMENT_WIDTH = document.documentElement.clientWidth;
-const DOCUMENT_HEIGHT = document.documentElement.clientHeight;
-const LEVEL_GUTTER = 2;
-const LEVEL_WIDTH = Math.round(DOCUMENT_WIDTH > 800 ? 800 : DOCUMENT_WIDTH);
-const LEVEL_HEIGHT = Math.round(DOCUMENT_HEIGHT > 800 ? 800 : DOCUMENT_HEIGHT);
-const LEVEL_POSITION = 'absolute';
-const LEVEL_X = 0;
-const LEVEL_Y = 0;
-const BRICK_ROW_MAX = 10;
-const BRICK_COL_MAX = 30;
-const BRICK_GUTTER = 2;
-const BRICK_WIDTH = Math.round(LEVEL_WIDTH / 10 - (BRICK_GUTTER + LEVEL_GUTTER / 10));
-const BRICK_HEIGHT = Math.round(LEVEL_HEIGHT / 30 - BRICK_GUTTER);
+class Settings {
+    constructor(maxWidth = document.documentElement.clientWidth, maxHeight = document.documentElement.clientHeight) {
+        this.wrapper = document.querySelector('.canvas-wrapper');
+        this.levelGutter = 2;
+        this.levelWidth = Math.round(maxWidth > 800 ? 800 : maxWidth);
+        this.levelHeight = Math.round(maxHeight > 800 ? 800 : maxHeight);
+        this.levelPosition = 'absolute';
+        this.levelX = 0;
+        this.levelY = 0;
+        this.brickRowMax = 10;
+        this.brickColMax = 30;
+        this.brickGutter = 2;
+        this.brickWidth = Math.round(this.levelWidth / 10 - (this.brickGutter + this.levelGutter / 10));
+        this.brickHeight = Math.round(this.levelHeight / 30 - this.brickGutter);
+        this.isLevelLoaded = false;
+        this.isLevelStarted = false;
+        this.isLevelPaused = false;
+        this.mouseX = undefined;
+        this.keyPause = 'Escape';
+    }
+}
 
 class Sound {
     constructor() {
@@ -47,12 +52,12 @@ class Layers {
     }
 
     set static(v) {
-        CANVAS_WRAPPER.appendChild(document.createElement('canvas')).classList.add('static');
+        settings.wrapper.appendChild(document.createElement('canvas')).classList.add('static');
         this._static = document.getElementsByClassName('static').item(0);
-        this._static.width = LEVEL_WIDTH;
-        this._static.height = LEVEL_HEIGHT;
-        this._static.style.top = LEVEL_X;
-        this._static.style.left = LEVEL_Y;
+        this._static.width = settings.levelWidth;
+        this._static.height = settings.levelHeight;
+        this._static.style.top = settings.levelX;
+        this._static.style.left = settings.levelY;
     }
 
     get static() {
@@ -60,13 +65,13 @@ class Layers {
     }
 
     set regular(v) {
-        CANVAS_WRAPPER.appendChild(document.createElement('canvas')).classList.add('regular');
+        settings.wrapper.appendChild(document.createElement('canvas')).classList.add('regular');
         this._regular = document.getElementsByClassName('regular').item(0);
-        this._regular.width = LEVEL_WIDTH;
-        this._regular.height = LEVEL_HEIGHT;
-        this._regular.style.position = LEVEL_POSITION;
-        this._regular.style.top = LEVEL_X;
-        this._regular.style.left = LEVEL_Y;
+        this._regular.width = settings.levelWidth;
+        this._regular.height = settings.levelHeight;
+        this._regular.style.position = settings.levelPosition;
+        this._regular.style.top = settings.levelX;
+        this._regular.style.left = settings.levelY;
     }
 
     get regular() {
@@ -74,13 +79,13 @@ class Layers {
     }
 
     set dynamic(v) {
-        CANVAS_WRAPPER.appendChild(document.createElement('canvas')).classList.add('dynamic');
+        settings.wrapper.appendChild(document.createElement('canvas')).classList.add('dynamic');
         this._dynamic = document.getElementsByClassName('dynamic').item(0);
-        this._dynamic.width = LEVEL_WIDTH;
-        this._dynamic.height = LEVEL_HEIGHT;
-        this._dynamic.style.position = LEVEL_POSITION;
-        this._dynamic.style.top = LEVEL_X;
-        this._dynamic.style.left = LEVEL_Y;
+        this._dynamic.width = settings.levelWidth;
+        this._dynamic.height = settings.levelHeight;
+        this._dynamic.style.position = settings.levelPosition;
+        this._dynamic.style.top = settings.levelX;
+        this._dynamic.style.left = settings.levelY;
     }
 
     get dynamic() {
@@ -127,13 +132,12 @@ class Layers {
             renderPlayer(this._dynamic);
             renderBall(this._dynamic);
             this.dynamicDrawRequest = false;
-
         }
     }
 
     clear(canvas) {
         let ctx = canvas.getContext('2d');
-        ctx.clearRect(LEVEL_X, LEVEL_Y, LEVEL_WIDTH, LEVEL_HEIGHT);
+        ctx.clearRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
     }
 }
 
@@ -141,8 +145,8 @@ class Layers {
 class Level {
     constructor(levelDifficulty = 1) {
         this.levelDifficulty = levelDifficulty;
-        this.x = LEVEL_X;
-        this.y = LEVEL_Y;
+        this.x = settings.levelX;
+        this.y = settings.levelY;
         this.strokeColor = "#000000";
         this.fillColor = "rgba(200,200,200,0.7)";
         this.bricks = [];
@@ -172,7 +176,7 @@ class Level {
             this.bricks[i] = [];
             let symmetryMode = false;
             let symmetry = [];
-            for (let j = 0; j < BRICK_ROW_MAX; j++) {
+            for (let j = 0; j < settings.brickRowMax; j++) {
                 if (!symmetryMode) {
                     this.bricks[i].push(new BrickType(j, i, this.randomBrickType(j)));
                     symmetry.push(this.bricks[i][j].type);
@@ -183,7 +187,7 @@ class Level {
                 if (this.bricks[i][j].type) {
                     bricksCount += 1;
                 }
-                if (j + 1 === BRICK_ROW_MAX / 2) {
+                if (j + 1 === settings.brickRowMax / 2) {
                     symmetryMode = true;
                 }
                 if ((i == minRowsCount - 1 && bricksCount < minBricksCount)) {
@@ -208,10 +212,10 @@ class Level {
 
 class Brick {
     constructor(x = 0, y = 0) { // smell - мутация входных параметров, x y - это порядковый номер в массиве кирпичей, его и нужно сохранить, а реальные координаты потом высчитывать по формуле
-        this.width = BRICK_WIDTH /* * 1.215 + BRICK_GUTTER*/;
-        this.height = BRICK_HEIGHT;
-        this.x = LEVEL_X + LEVEL_GUTTER + BRICK_GUTTER * x + x * this.width;
-        this.y = LEVEL_Y + LEVEL_GUTTER + BRICK_GUTTER * y + y * this.height;
+        this.width = settings.brickWidth /* * 1.215 + settings.brickGutter*/;
+        this.height = settings.brickHeight;
+        this.x = settings.levelX + settings.levelGutter + settings.brickGutter * x + x * this.width;
+        this.y = settings.levelY + settings.levelGutter + settings.brickGutter * y + y * this.height;
     }
 }
 
@@ -277,7 +281,7 @@ class BrickType extends Brick { // smell - лучше использовать �
     }
 
     brickStatus() {
-        if (this.type === 0 || this.strength === 0) {
+        if (this.type <= 0 || this.strength <= 0) {
             this.baseColor = "transparent";
             this.topColor = "transparent";
             this.bottomColor = "transparent";
@@ -308,8 +312,8 @@ class Player {
     constructor() {
         this.width = 120;
         this.height = 22;
-        this.x = LEVEL_X + (LEVEL_WIDTH / 2) - this.width / 2;
-        this.y = LEVEL_Y + LEVEL_HEIGHT - LEVEL_GUTTER * 4 - this.height;
+        this.x = settings.levelX + (settings.levelWidth / 2) - this.width / 2;
+        this.y = settings.levelY + settings.levelHeight - settings.levelGutter * 4 - this.height;
     }
 
     update() {
@@ -318,15 +322,15 @@ class Player {
 
     movement() {
         let CANVAS_X = Math.round(layers.static.getBoundingClientRect().left);
-        if (mouseX !== this.x + CANVAS_X + this.width / 2 && player.x > LEVEL_X && player.x + player.width < LEVEL_X + LEVEL_WIDTH) {
+        if (settings.mouseX !== this.x + CANVAS_X + this.width / 2 && player.x > settings.levelX && player.x + player.width < settings.levelX + settings.levelWidth) {
             layers.dynamicDrawRequest = true;
         }
-        this.x = mouseX - CANVAS_X - this.width / 2 || LEVEL_X + (LEVEL_WIDTH / 2) - this.width / 2;
-        if (player.x < LEVEL_X) {
-            player.x = LEVEL_X;
+        this.x = settings.mouseX - CANVAS_X - this.width / 2 || settings.levelX + (settings.levelWidth / 2) - this.width / 2;
+        if (player.x < settings.levelX) {
+            player.x = settings.levelX;
         }
-        if (player.x + player.width > LEVEL_X + LEVEL_WIDTH) {
-            player.x = LEVEL_X + LEVEL_WIDTH - player.width;
+        if (player.x + player.width > settings.levelX + settings.levelWidth) {
+            player.x = settings.levelX + settings.levelWidth - player.width;
         }
     }
 }
@@ -404,15 +408,15 @@ class Ball {
     }
 
     wallReflect() {
-        if (this.x - this.radius < LEVEL_X || this.x + this.radius > LEVEL_X + LEVEL_WIDTH) {
+        if (this.x - this.radius < settings.levelX || this.x + this.radius > settings.levelX + settings.levelWidth) {
             this.reflectHorizontal();
             Sound.reflect();
         }
-        if (this.y - this.radius < LEVEL_Y) {
+        if (this.y - this.radius < settings.levelY) {
             this.reflectVertical();
             Sound.reflect();
         }
-        if (this.y - this.radius > LEVEL_Y + LEVEL_HEIGHT && !this.isDead) {
+        if (this.y - this.radius > settings.levelY + settings.levelHeight && !this.isDead) {
             this.isDead = true;
             Sound.lost();
             this.vx = 0;
@@ -422,6 +426,7 @@ class Ball {
 }
 
 function createLevel(levelDifficulty) {
+    settings = new Settings();
     layers = new Layers();
     level = new Level(levelDifficulty);
     level.createRandomBricks();
@@ -453,13 +458,12 @@ function animate() {
 }
 
 function renderLevel(canvas) {
-    console.log('draw level');
     ctx = canvas.getContext('2d');
     ctx.strokeStyle = level.strokeColor;
     ctx.lineWidth = 1;
-    ctx.strokeRect(LEVEL_X, LEVEL_Y, LEVEL_WIDTH, LEVEL_HEIGHT);
+    ctx.strokeRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
     ctx.fillStyle = level.fillColor;
-    ctx.fillRect(LEVEL_X, LEVEL_Y, LEVEL_WIDTH, LEVEL_HEIGHT);
+    ctx.fillRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
 }
 
 function renderBricks(canvas) {
@@ -479,9 +483,9 @@ function renderBricks(canvas) {
             ctx.shadowBlur = 0;
             ctx.beginPath();
             ctx.moveTo(level.bricks[i][j].x, level.bricks[i][j].y);
-            ctx.lineTo(level.bricks[i][j].x + 20, level.bricks[i][j].y + BRICK_HEIGHT / 2);
-            ctx.lineTo(level.bricks[i][j].x + BRICK_WIDTH - 20, level.bricks[i][j].y + BRICK_HEIGHT / 2);
-            ctx.lineTo(level.bricks[i][j].x + BRICK_WIDTH, level.bricks[i][j].y);
+            ctx.lineTo(level.bricks[i][j].x + 20, level.bricks[i][j].y + settings.brickHeight / 2);
+            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth - 20, level.bricks[i][j].y + settings.brickHeight / 2);
+            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth, level.bricks[i][j].y);
             ctx.closePath();
             ctx.lineWidth = 0.1;
             ctx.fillStyle = level.bricks[i][j].topColor;
@@ -489,10 +493,10 @@ function renderBricks(canvas) {
             ctx.fill();
             // bottom side
             ctx.beginPath();
-            ctx.moveTo(level.bricks[i][j].x, level.bricks[i][j].y + BRICK_HEIGHT);
-            ctx.lineTo(level.bricks[i][j].x + 20, level.bricks[i][j].y + BRICK_HEIGHT / 2);
-            ctx.lineTo(level.bricks[i][j].x + BRICK_WIDTH - 20, level.bricks[i][j].y + BRICK_HEIGHT / 2);
-            ctx.lineTo(level.bricks[i][j].x + BRICK_WIDTH, level.bricks[i][j].y + BRICK_HEIGHT);
+            ctx.moveTo(level.bricks[i][j].x, level.bricks[i][j].y + settings.brickHeight);
+            ctx.lineTo(level.bricks[i][j].x + 20, level.bricks[i][j].y + settings.brickHeight / 2);
+            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth - 20, level.bricks[i][j].y + settings.brickHeight / 2);
+            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth, level.bricks[i][j].y + settings.brickHeight);
             ctx.closePath();
             ctx.lineWidth = 0.1;
             ctx.fillStyle = level.bricks[i][j].bottomColor;
@@ -625,10 +629,18 @@ function renderBall(canvas) {
 
 function mouseAction() {
     document.onmousemove = function (e) {
-        mouseX = e.clientX;
+        settings.mouseX = e.clientX;
     }
     document.oncontextmenu = function () {
         return false;
+    }
+    document.onkeydown = function (e) {
+        e = e || window.event;
+        let isEscape = false;
+        isEscape = (e.key === settings.keyPause);
+        if (isEscape) {
+            alert("Pause");
+        }
     }
 }
 
