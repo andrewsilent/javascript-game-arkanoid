@@ -1,6 +1,5 @@
 class Settings {
     constructor(maxWidth = document.documentElement.clientWidth, maxHeight = document.documentElement.clientHeight) {
-        this.wrapper = document.querySelector('.canvas-wrapper');
         this.levelGutter = 2;
         this.levelWidth = Math.round(maxWidth > 800 ? 800 : maxWidth);
         this.levelHeight = Math.round(maxHeight > 800 ? 800 : maxHeight);
@@ -52,12 +51,9 @@ class Layers {
     }
 
     set static(v) {
-        settings.wrapper.appendChild(document.createElement('canvas')).classList.add('static');
-        this._static = document.getElementsByClassName('static').item(0);
+        this._static = document.querySelector('.static');
         this._static.width = settings.levelWidth;
         this._static.height = settings.levelHeight;
-        this._static.style.top = settings.levelX;
-        this._static.style.left = settings.levelY;
     }
 
     get static() {
@@ -65,13 +61,9 @@ class Layers {
     }
 
     set regular(v) {
-        settings.wrapper.appendChild(document.createElement('canvas')).classList.add('regular');
-        this._regular = document.getElementsByClassName('regular').item(0);
+        this._regular = document.querySelector('.regular');
         this._regular.width = settings.levelWidth;
         this._regular.height = settings.levelHeight;
-        this._regular.style.position = settings.levelPosition;
-        this._regular.style.top = settings.levelX;
-        this._regular.style.left = settings.levelY;
     }
 
     get regular() {
@@ -79,13 +71,9 @@ class Layers {
     }
 
     set dynamic(v) {
-        settings.wrapper.appendChild(document.createElement('canvas')).classList.add('dynamic');
-        this._dynamic = document.getElementsByClassName('dynamic').item(0);
+        this._dynamic = document.querySelector('.dynamic');
         this._dynamic.width = settings.levelWidth;
         this._dynamic.height = settings.levelHeight;
-        this._dynamic.style.position = settings.levelPosition;
-        this._dynamic.style.top = settings.levelX;
-        this._dynamic.style.left = settings.levelY;
     }
 
     get dynamic() {
@@ -118,29 +106,20 @@ class Layers {
 
     update() {
         if (this.staticDrawRequest) {
-            this.clear(this._static);
             renderLevel(this._static);
             this.staticDrawRequest = false;
         }
         if (this.regularDrawRequest) {
-            this.clear(this._regular);
             renderBricks(this._regular);
             this.regularDrawRequest = false;
         }
         if (this.dynamicDrawRequest) {
-            this.clear(this._dynamic);
-            renderPlayer(this._dynamic);
             renderBall(this._dynamic);
+            renderPlayer(this._dynamic);
             this.dynamicDrawRequest = false;
         }
     }
-
-    clear(canvas) {
-        let ctx = canvas.getContext('2d');
-        ctx.clearRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
-    }
 }
-
 
 class Level {
     constructor(levelDifficulty = 1) {
@@ -150,10 +129,6 @@ class Level {
         this.strokeColor = "#000000";
         this.fillColor = "rgba(200,200,200,0.7)";
         this.bricks = [];
-    }
-
-    update() {
-
     }
 
     createRandomBricks() { // smell - использовать Фабрику, перенести генерацию, переписать способ генерации на функции с рекурсией
@@ -425,15 +400,6 @@ class Ball {
     }
 }
 
-function createLevel(levelDifficulty) {
-    settings = new Settings();
-    layers = new Layers();
-    level = new Level(levelDifficulty);
-    level.createRandomBricks();
-    player = new Player();
-    ball = new Ball();
-}
-
 function run() {
     // render();
     update();
@@ -441,14 +407,9 @@ function run() {
 }
 
 function update() {
-    mouseAction();
+    mouseHandler();
     layers.update();
-    level.update();
-    for (let i = 0; i < level.bricks.length; i++) {
-        for (j = 0; j < level.bricks[i].length; j++) {
-            level.bricks[i][j].update();
-        }
-    }
+    level.bricks.forEach(row => row.forEach(brick => brick.update()));
     player.update();
     ball.update();
 }
@@ -459,6 +420,7 @@ function animate() {
 
 function renderLevel(canvas) {
     ctx = canvas.getContext('2d');
+    ctx.clearRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
     ctx.strokeStyle = level.strokeColor;
     ctx.lineWidth = 1;
     ctx.strokeRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
@@ -468,42 +430,39 @@ function renderLevel(canvas) {
 
 function renderBricks(canvas) {
     ctx = canvas.getContext('2d');
-    for (let i = 0; i < level.bricks.length; i++) {
-        for (j = 0; j < level.bricks[i].length; j++) {
-            // base
-            ctx.shadowColor = '#666666';
-            ctx.shadowOffsetY = 2;
-            ctx.shadowBlur = 5;
-            ctx.fillStyle = level.bricks[i][j].baseColor;
-            ctx.fillRect(level.bricks[i][j].x, level.bricks[i][j].y, level.bricks[i][j].width, level.bricks[i][j].height);
-            ctx.strokeStyle = level.bricks[i][j].strokeColor;
-            // top side
-            ctx.shadowColor = 'transparent';
-            ctx.shadowOffsetY = 0;
-            ctx.shadowBlur = 0;
-            ctx.beginPath();
-            ctx.moveTo(level.bricks[i][j].x, level.bricks[i][j].y);
-            ctx.lineTo(level.bricks[i][j].x + 20, level.bricks[i][j].y + settings.brickHeight / 2);
-            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth - 20, level.bricks[i][j].y + settings.brickHeight / 2);
-            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth, level.bricks[i][j].y);
-            ctx.closePath();
-            ctx.lineWidth = 0.1;
-            ctx.fillStyle = level.bricks[i][j].topColor;
-            ctx.stroke();
-            ctx.fill();
-            // bottom side
-            ctx.beginPath();
-            ctx.moveTo(level.bricks[i][j].x, level.bricks[i][j].y + settings.brickHeight);
-            ctx.lineTo(level.bricks[i][j].x + 20, level.bricks[i][j].y + settings.brickHeight / 2);
-            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth - 20, level.bricks[i][j].y + settings.brickHeight / 2);
-            ctx.lineTo(level.bricks[i][j].x + settings.brickWidth, level.bricks[i][j].y + settings.brickHeight);
-            ctx.closePath();
-            ctx.lineWidth = 0.1;
-            ctx.fillStyle = level.bricks[i][j].bottomColor;
-            ctx.stroke();
-            ctx.fill();
-        }
-    }
+    ctx.clearRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
+    ctx.lineWidth = 0.1;
+    level.bricks.forEach(row => row.forEach(brick => {
+        ctx.shadowColor = '#666666';
+        ctx.shadowOffsetY = 2;
+        ctx.shadowBlur = 5;
+        ctx.fillStyle = brick.baseColor;
+        ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+        ctx.strokeStyle = brick.strokeColor;
+        ctx.shadowColor = 'transparent';
+        ctx.shadowOffsetY = 0;
+        ctx.shadowBlur = 0;
+        // top side
+        ctx.beginPath();
+        ctx.moveTo(brick.x, brick.y);
+        ctx.lineTo(brick.x + 20, brick.y + settings.brickHeight / 2);
+        ctx.lineTo(brick.x + settings.brickWidth - 20, brick.y + settings.brickHeight / 2);
+        ctx.lineTo(brick.x + settings.brickWidth, brick.y);
+        ctx.closePath();
+        ctx.fillStyle = brick.topColor;
+        ctx.stroke();
+        ctx.fill();
+        // bottom side
+        ctx.beginPath();
+        ctx.moveTo(brick.x, brick.y + settings.brickHeight);
+        ctx.lineTo(brick.x + 20, brick.y + settings.brickHeight / 2);
+        ctx.lineTo(brick.x + settings.brickWidth - 20, brick.y + settings.brickHeight / 2);
+        ctx.lineTo(brick.x + settings.brickWidth, brick.y + settings.brickHeight);
+        ctx.closePath();
+        ctx.fillStyle = brick.bottomColor;
+        ctx.stroke();
+        ctx.fill();
+    }));
 }
 
 function renderPlayer(canvas) {
@@ -611,6 +570,7 @@ function renderPlayer(canvas) {
 
 function renderBall(canvas) {
     ctx = canvas.getContext('2d');
+    ctx.clearRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
     let gradient = ctx.createRadialGradient(ball.x - 2, ball.y - 2, 0, ball.x - 2, ball.y - 2, 10);
     gradient.addColorStop(0, '#FFFFFF');
     gradient.addColorStop(.1, '#CCCCCC');
@@ -627,7 +587,7 @@ function renderBall(canvas) {
     ctx.stroke();
 }
 
-function mouseAction() {
+function mouseHandler() {
     document.onmousemove = function (e) {
         settings.mouseX = e.clientX;
     }
@@ -644,5 +604,22 @@ function mouseAction() {
     }
 }
 
-createLevel();
-run();
+function init() {
+    document.body.appendChild(document.createElement('div')).classList.add('wrapper');
+    document.querySelector('.wrapper').appendChild(document.createElement('div')).classList.add('container');
+    const container = document.querySelector('.container');
+    container.appendChild(document.createElement('canvas')).classList.add('static');
+    container.appendChild(document.createElement('canvas')).classList.add('regular');
+    document.querySelector('.regular').setAttribute('style', 'position: absolute; top: 0; left: 0');
+    container.appendChild(document.createElement('canvas')).classList.add('dynamic');
+    document.querySelector('.dynamic').setAttribute('style', 'position: absolute; top: 0; left: 0');
+    settings = new Settings();
+    layers = new Layers();
+    level = new Level();
+    level.createRandomBricks();
+    player = new Player();
+    ball = new Ball();
+    run();
+}
+
+init();
