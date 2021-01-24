@@ -3,7 +3,6 @@ class Settings {
         this.levelGutter = 2;
         this.levelWidth = Math.round(maxWidth > 800 ? 800 : maxWidth);
         this.levelHeight = Math.round(maxHeight > 800 ? 800 : maxHeight);
-        this.levelPosition = 'absolute';
         this.levelX = 0;
         this.levelY = 0;
         this.brickRowMax = 10;
@@ -11,6 +10,7 @@ class Settings {
         this.brickGutter = 2;
         this.brickWidth = Math.round(this.levelWidth / 10 - (this.brickGutter + this.levelGutter / 10));
         this.brickHeight = Math.round(this.levelHeight / 30 - this.brickGutter);
+        this.brickColorScheme = [["transparent", "transparent", "transparent", "transparent"], ["#017374", "#2B898A", "#015859", "#000000"], ["#2E5873", "#3D7699", "#1F3B4D", "#000000"]];
         this.isLevelLoaded = false;
         this.isLevelStarted = false;
         this.isLevelPaused = false;
@@ -105,6 +105,10 @@ class Layers {
     }
 
     update() {
+        this.redrawIfNeed();
+    }
+
+    redrawIfNeed() {
         if (this.staticDrawRequest) {
             renderLevel(this._static);
             this.staticDrawRequest = false;
@@ -131,94 +135,121 @@ class Level {
         this.bricks = [];
     }
 
-    createRandomBricks() { // smell - использовать Фабрику, перенести генерацию, переписать способ генерации на функции с рекурсией
-        let emptyRows = 0;
-        let rowsCount = 0;
-        let bricksCount = 0;
+    update() {
+        this.updateBricks();
+    }
+
+    updateBricks() {
+        level.bricks.forEach(row => row.forEach((brick, j, object) => {
+            brick
+                ? brick.strength > 0
+                    ? brick.update()
+                    : object.splice(j, 1, null)
+                : null
+        }));
+    }
+
+    generateBricks() {
+        let symmetryMode = true;
         let minRowsCount = 1;
         let minBricksCount = 30;
-        for (let i = 0; i < minRowsCount; i++) {
-            if (!this.randomRowExistance(emptyRows)) {
+        let bricksCount = 0;
+        let rowLength = Math.floor(settings.levelWidth / settings.brickWidth);
+        while (this.bricks.length < minRowsCount) {
+            if (this.rowRandomizer()) {
                 this.bricks.push([]);
-                emptyRows += 1;
-                minRowsCount += 1;
+                minRowsCount++;
                 continue;
             }
-            if (bricksCount > minBricksCount) {
-                break;
+            const prototype = [];
+            while (prototype.length < rowLength) {
+                prototype.push(this.colRandomizer());
             }
-            rowsCount += 1;
-            this.bricks[i] = [];
-            let symmetryMode = false;
-            let symmetry = [];
-            for (let j = 0; j < settings.brickRowMax; j++) {
-                if (!symmetryMode) {
-                    this.bricks[i].push(new BrickType(j, i, this.randomBrickType(j)));
-                    symmetry.push(this.bricks[i][j].type);
-                }
-                if (symmetryMode) {
-                    this.bricks[i].push(new BrickType(j, i, symmetry.pop()));
-                }
-                if (this.bricks[i][j].type) {
-                    bricksCount += 1;
-                }
-                if (j + 1 === settings.brickRowMax / 2) {
-                    symmetryMode = true;
-                }
-                if ((i == minRowsCount - 1 && bricksCount < minBricksCount)) {
-                    minRowsCount += 1;
-                }
-                this.bricks[i][j].brickStatus();
-            }
+            symmetryMode ? prototype.splice(prototype.length / 2, prototype.length, ...prototype.slice(0, prototype.length / 2).reverse()) : prototype;
+            const row = prototype.map((e, i) => (e) ? e = new Brick(this.bricks.length, i, e) : null);
+            bricksCount += row.filter(Boolean).length;
+            bricksCount < minBricksCount ? minRowsCount++ : minRowsCount;
+            this.bricks.push(row);
         }
     }
 
-    randomRowExistance(emptyRows) {
-        return Math.random() < 0.3 + this.levelDifficulty * 0.3 + emptyRows * 0.1;
+    rowRandomizer() {
+        return Math.random() < 0.25;
     }
 
-    randomBrickType(j) {
-        if (j > 2) {
-            return Math.ceil(Math.random() * (this.levelDifficulty));
-        }
-        return Math.ceil(Math.random() * (this.levelDifficulty + 2) - 1);
-    }
-}
-
-class Brick {
-    constructor(x = 0, y = 0) { // smell - мутация входных параметров, x y - это порядковый номер в массиве кирпичей, его и нужно сохранить, а реальные координаты потом высчитывать по формуле
-        this.width = settings.brickWidth /* * 1.215 + settings.brickGutter*/;
-        this.height = settings.brickHeight;
-        this.x = settings.levelX + settings.levelGutter + settings.brickGutter * x + x * this.width;
-        this.y = settings.levelY + settings.levelGutter + settings.brickGutter * y + y * this.height;
+    colRandomizer(i, j) {
+        return Math.random() < 0.25
+            ? null
+            : Math.random() < 0.25
+                ? 2
+                : 1;
     }
 }
 
-class BrickType extends Brick { // smell - лучше использовать паттерн Фабрика, и переписать генерацию кирпичей в фабрику / плюс сейчас происходит мутация входных данных x,y - это i,j
-    constructor(x, y, type) {
-        super(x, y);
-        this.type = type;
-        this.strength = undefined;
+class BrickProto {
+    constructor(i, j) {
+        this.width = Math.round(settings.levelWidth / 10 - (settings.brickGutter + settings.levelGutter / 10));
+        this.height = Math.round(settings.levelHeight / 30 - settings.brickGutter);
+        this.i = i;
+        this.j = j;
+        this.x = settings.levelX + settings.levelGutter + settings.brickGutter * this.j + this.width * this.j;
+        this.y = settings.levelY + settings.levelGutter + settings.brickGutter * this.i + this.height * this.i;
+    }
+
+    set j(v) {
+        this._j = v;
+    }
+
+    get j() {
+        return this._j;
+    }
+
+    set i(v) {
+        this._i = v;
+    }
+
+    get i() {
+        return this._i;
+    }
+}
+
+class Brick extends BrickProto {
+    constructor(i, j, strength) {
+        super(i, j);
+        this.strength = strength;
         this.hasBonus = false;
-        this.baseColor = "transparent";
-        this.topColor = "transparent";
-        this.bottomColor = "transparent";
-        this.strokeColor = "transparent";
+        this.colorScheme = undefined;
+    }
+
+    set strength(v) {
+        this._strength = v;
+    }
+
+    get strength() {
+        return this._strength;
+    }
+
+    set colorScheme(v) {
+        this._colorScheme = v || settings.brickColorScheme[this.strength];
+    }
+
+    get colorScheme() {
+        return this._colorScheme;
     }
 
     update() {
-        if (this.type !== 0) {  // smell - зона ответственности Ball попала в другое место
-            if (this.leftImpact() || this.rightImpact()) {
-                ball.reflectHorizontal();
-                this.hit();
+        this.collizionDetection();
+    }
 
-            }
-            if (this.topImpact() || this.bottomImpact()) {
-                ball.reflectVertical();
-                this.hit();
-            }
+    collizionDetection() {
+        if (this.leftImpact() || this.rightImpact()) { // smell - зона ответственности Ball попала в другое место
+            ball.reflectHorizontal();
+            this.hit();
         }
-        this.brickStatus();
+        if (this.topImpact() || this.bottomImpact()) {
+            ball.reflectVertical();
+            this.hit();
+        }
     }
 
     bottomImpact() {
@@ -243,43 +274,17 @@ class BrickType extends Brick { // smell - лучше использовать �
     }
 
     isInHorizontalRange() { // по горизонтали мяч находится в пределах кирпича
-        return ball.x < this.x + this.width && ball.x > this.x;
+        return ball.x <= this.x + this.width && ball.x >= this.x;
     }
     isInVerticalRange() { // по вертикали мяч находится в пределах кирпича
-        return ball.y < this.y + this.height && ball.y > this.y;
+        return ball.y <= this.y + this.height && ball.y >= this.y;
     }
 
     hit() {
         this.strength -= 1;
+        this.colorScheme = settings.brickColorScheme[this.strength];
         layers.regularDrawRequest = true;
         Sound.hit();
-    }
-
-    brickStatus() {
-        if (this.type <= 0 || this.strength <= 0) {
-            this.baseColor = "transparent";
-            this.topColor = "transparent";
-            this.bottomColor = "transparent";
-            this.strokeColor = "transparent";
-            this.strength = 0;
-            this.type = 0;
-        }
-        if (this.type === 1 || this.strength === 1) {
-            this.baseColor = "#017374";
-            this.topColor = "#2B898A";
-            this.bottomColor = "#015859";
-            this.strokeColor = "#000000";
-            this.strength = 1;
-            this.type = 1;
-        }
-        if (this.type === 2 || this.strength === 2) {
-            this.baseColor = "#2E5873";
-            this.topColor = "#3D7699";
-            this.bottomColor = "#1F3B4D";
-            this.strokeColor = "#000000";
-            this.strength = 2;
-            this.type = 2;
-        }
     }
 }
 
@@ -407,9 +412,9 @@ function run() {
 }
 
 function update() {
-    mouseHandler();
+    controls();
     layers.update();
-    level.bricks.forEach(row => row.forEach(brick => brick.update()));
+    level.update();
     player.update();
     ball.update();
 }
@@ -433,35 +438,38 @@ function renderBricks(canvas) {
     ctx.clearRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
     ctx.lineWidth = 0.1;
     level.bricks.forEach(row => row.forEach(brick => {
-        ctx.shadowColor = '#666666';
-        ctx.shadowOffsetY = 2;
-        ctx.shadowBlur = 5;
-        ctx.fillStyle = brick.baseColor;
-        ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
-        ctx.strokeStyle = brick.strokeColor;
-        ctx.shadowColor = 'transparent';
-        ctx.shadowOffsetY = 0;
-        ctx.shadowBlur = 0;
-        // top side
-        ctx.beginPath();
-        ctx.moveTo(brick.x, brick.y);
-        ctx.lineTo(brick.x + 20, brick.y + settings.brickHeight / 2);
-        ctx.lineTo(brick.x + settings.brickWidth - 20, brick.y + settings.brickHeight / 2);
-        ctx.lineTo(brick.x + settings.brickWidth, brick.y);
-        ctx.closePath();
-        ctx.fillStyle = brick.topColor;
-        ctx.stroke();
-        ctx.fill();
-        // bottom side
-        ctx.beginPath();
-        ctx.moveTo(brick.x, brick.y + settings.brickHeight);
-        ctx.lineTo(brick.x + 20, brick.y + settings.brickHeight / 2);
-        ctx.lineTo(brick.x + settings.brickWidth - 20, brick.y + settings.brickHeight / 2);
-        ctx.lineTo(brick.x + settings.brickWidth, brick.y + settings.brickHeight);
-        ctx.closePath();
-        ctx.fillStyle = brick.bottomColor;
-        ctx.stroke();
-        ctx.fill();
+        if (brick) {
+            [baseColor, topColor, bottomColor, strokeColor] = brick.colorScheme;
+            ctx.shadowColor = '#666666';
+            ctx.shadowOffsetY = 2;
+            ctx.shadowBlur = 5;
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+            ctx.strokeStyle = strokeColor;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowOffsetY = 0;
+            ctx.shadowBlur = 0;
+            // top side
+            ctx.beginPath();
+            ctx.moveTo(brick.x, brick.y);
+            ctx.lineTo(brick.x + 20, brick.y + settings.brickHeight / 2);
+            ctx.lineTo(brick.x + settings.brickWidth - 20, brick.y + settings.brickHeight / 2);
+            ctx.lineTo(brick.x + settings.brickWidth, brick.y);
+            ctx.closePath();
+            ctx.fillStyle = topColor;
+            ctx.stroke();
+            ctx.fill();
+            // bottom side
+            ctx.beginPath();
+            ctx.moveTo(brick.x, brick.y + settings.brickHeight);
+            ctx.lineTo(brick.x + 20, brick.y + settings.brickHeight / 2);
+            ctx.lineTo(brick.x + settings.brickWidth - 20, brick.y + settings.brickHeight / 2);
+            ctx.lineTo(brick.x + settings.brickWidth, brick.y + settings.brickHeight);
+            ctx.closePath();
+            ctx.fillStyle = bottomColor;
+            ctx.stroke();
+            ctx.fill();
+        }
     }));
 }
 
@@ -532,7 +540,6 @@ function renderPlayer(canvas) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-
     // right corner
     ctx.beginPath();
     ctx.moveTo(player.x + player.width - 20, player.y);
@@ -587,7 +594,7 @@ function renderBall(canvas) {
     ctx.stroke();
 }
 
-function mouseHandler() {
+function controls() {
     document.onmousemove = function (e) {
         settings.mouseX = e.clientX;
     }
@@ -616,7 +623,7 @@ function init() {
     settings = new Settings();
     layers = new Layers();
     level = new Level();
-    level.createRandomBricks();
+    level.generateBricks();
     player = new Player();
     ball = new Ball();
     run();
