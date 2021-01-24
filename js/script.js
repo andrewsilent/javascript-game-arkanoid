@@ -1,15 +1,16 @@
 class Settings {
-    constructor(maxWidth = document.documentElement.clientWidth, maxHeight = document.documentElement.clientHeight) {
+    constructor(maxWidth = document.documentElement.clientWidth > 936 ? 936 : document.documentElement.clientWidth, maxHeight = document.documentElement.clientHeight > 768 ? 768 : document.documentElement.clientHeight) {
+        this.maxWidth = maxWidth;
+        this.maxHeight = maxHeight;
+        this.levelHeight = maxHeight;
+        this.levelWidth = Math.round(maxWidth * 0.9);
+        this.levelInfo = Math.round(maxWidth * 0.1);
         this.levelGutter = 2;
-        this.levelWidth = Math.round(maxWidth > 800 ? 800 : maxWidth);
-        this.levelHeight = Math.round(maxHeight > 800 ? 800 : maxHeight);
         this.levelX = 0;
         this.levelY = 0;
-        this.brickRowMax = 10;
-        this.brickColMax = 30;
         this.brickGutter = 2;
-        this.brickWidth = Math.round(this.levelWidth / 10 - (this.brickGutter + this.levelGutter / 10));
-        this.brickHeight = Math.round(this.levelHeight / 30 - this.brickGutter);
+        this.brickWidth = Math.round(((this.levelWidth - this.levelGutter) / 10) - this.brickGutter);
+        this.brickHeight = Math.round(this.levelHeight / 28 - this.brickGutter);
         this.brickColorScheme = [["transparent", "transparent", "transparent", "transparent"], ["#017374", "#2B898A", "#015859", "#000000"], ["#2E5873", "#3D7699", "#1F3B4D", "#000000"]];
         this.isLevelLoaded = false;
         this.isLevelStarted = false;
@@ -45,6 +46,7 @@ class Layers {
         this.static = null;
         this.regular = null;
         this.dynamic = null;
+        this.info = null;
         this.staticDrawRequest = true;
         this.regularDrawRequest = true;
         this.dynamicDrawRequest = true;
@@ -80,6 +82,14 @@ class Layers {
         return this._dynamic;
     }
 
+    set info(v) {
+        this._info = document.querySelector('.info');
+    }
+
+    get info() {
+        return this._info;
+    }
+
     set staticDrawRequest(v) {
         this._staticDrawRequest = v;
     }
@@ -109,10 +119,6 @@ class Layers {
     }
 
     redrawIfNeed() {
-        if (this.staticDrawRequest) {
-            renderLevel(this._static);
-            this.staticDrawRequest = false;
-        }
         if (this.regularDrawRequest) {
             renderBricks(this._regular);
             this.regularDrawRequest = false;
@@ -126,13 +132,41 @@ class Layers {
 }
 
 class Level {
-    constructor(levelDifficulty = 1) {
-        this.levelDifficulty = levelDifficulty;
+    constructor(level = 1) {
         this.x = settings.levelX;
         this.y = settings.levelY;
-        this.strokeColor = "#000000";
-        this.fillColor = "rgba(200,200,200,0.7)";
         this.bricks = [];
+        this.strike = 0;
+        this.levelField = document.querySelector('.level span');
+        this.level = level;
+        this.scoreField = document.querySelector('.score span');
+        this.score = 0;
+        this.totalField = document.querySelector('.total span');
+        this.total = 0;
+    }
+
+    set strike(v) {
+        this._strike = v;
+    }
+
+    get strike() {
+        return this._strike;
+    }
+
+    set score(v) {
+        this._score = v;
+    }
+
+    get score() {
+        return this._score;
+    }
+
+    set total(v) {
+        this._total = v;
+    }
+
+    get total() {
+        return this._total;
     }
 
     update() {
@@ -147,6 +181,13 @@ class Level {
                     : object.splice(j, 1, null)
                 : null
         }));
+    }
+
+    updateInfo() {
+        this.levelField.textContent = this.level;
+        this.scoreField.textContent = this.score;
+        this.score > this.total ? this.total = this.score : this.total;
+        this.totalField.textContent = this.total;
     }
 
     generateBricks() {
@@ -188,8 +229,8 @@ class Level {
 
 class BrickProto {
     constructor(i, j) {
-        this.width = Math.round(settings.levelWidth / 10 - (settings.brickGutter + settings.levelGutter / 10));
-        this.height = Math.round(settings.levelHeight / 30 - settings.brickGutter);
+        this.width = settings.brickWidth;
+        this.height = settings.brickHeight;
         this.i = i;
         this.j = j;
         this.x = settings.levelX + settings.levelGutter + settings.brickGutter * this.j + this.width * this.j;
@@ -281,8 +322,11 @@ class Brick extends BrickProto {
     }
 
     hit() {
+        level.strike += 1;
+        level.score += 10 * level.strike;
         this.strength -= 1;
         this.colorScheme = settings.brickColorScheme[this.strength];
+        level.updateInfo();
         layers.regularDrawRequest = true;
         Sound.hit();
     }
@@ -364,6 +408,7 @@ class Ball {
     touchDown() {
         if (this.x - this.radius > player.x && this.x + this.radius < player.x + player.width) {
             if (this.y + this.radius > player.y && !this.isDead) {
+                level.strike = 0;
                 this.reflectFromPlayer();
                 Sound.reflect();
             }
@@ -417,16 +462,6 @@ function update() {
 
 function animate() {
     requestAnimationFrame(run);
-}
-
-function renderLevel(canvas) {
-    ctx = canvas.getContext('2d');
-    ctx.clearRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
-    ctx.strokeStyle = level.strokeColor;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
-    ctx.fillStyle = level.fillColor;
-    ctx.fillRect(settings.levelX, settings.levelY, settings.levelWidth, settings.levelHeight);
 }
 
 function renderBricks(canvas) {
@@ -607,18 +642,44 @@ function controls() {
     }
 }
 
-function init() {
+function addHTML() {
     document.body.appendChild(document.createElement('div')).classList.add('wrapper');
     document.querySelector('.wrapper').appendChild(document.createElement('div')).classList.add('container');
     const container = document.querySelector('.container');
+    container.setAttribute('style', `display: flex; width: 100%; height: 100%; max-width: 1024px; max-height: 768px;`);
     container.appendChild(document.createElement('canvas')).classList.add('static');
+    document.querySelector('.static').setAttribute('style', 'display: block; background-color: rgba(200,200,200,0.75)');
     container.appendChild(document.createElement('canvas')).classList.add('regular');
     document.querySelector('.regular').setAttribute('style', 'position: absolute; top: 0; left: 0');
     container.appendChild(document.createElement('canvas')).classList.add('dynamic');
     document.querySelector('.dynamic').setAttribute('style', 'position: absolute; top: 0; left: 0');
+    container.appendChild(document.createElement('div')).classList.add('info');
+    const info = document.querySelector('.info');
+    info.setAttribute('style', 'display: block; width: 100%; background-color: rgba(31, 59, 77, 0.5); color: #EEE; margin-left: 10px; font: 400 1rem/1.5 Arial, sans-serif; text-align: right; padding: 20px');
+    const lvl = info.appendChild(document.createElement('p'));
+    lvl.classList.add('level');
+    lvl.textContent = 'Level';
+    const spanlvl = lvl.appendChild(document.createElement('span'));
+    spanlvl.setAttribute('style', 'display: block; font: 400 2rem/1.5 Arial, sans-serif; margin-bottom: 20px');
+    const score = info.appendChild(document.createElement('p'));
+    score.classList.add('score');
+    score.textContent = 'Score';
+    const spanscore = score.appendChild(document.createElement('span'));
+    spanscore.setAttribute('style', 'display: block; font: 400 2rem/1.5 Arial, sans-serif; margin-bottom: 20px');
+    const total = info.appendChild(document.createElement('p'));
+    total.classList.add('total');
+    total.textContent = 'Total score';
+    const spantotal = total.appendChild(document.createElement('span'));
+    spantotal.setAttribute('style', 'display: block; font: 400 2rem/1.5 Arial, sans-serif; margin-bottom: 20px');
+
+}
+
+function init() {
+    addHTML();
     settings = new Settings();
     layers = new Layers();
     level = new Level();
+    level.updateInfo();
     level.generateBricks();
     player = new Player();
     ball = new Ball();
