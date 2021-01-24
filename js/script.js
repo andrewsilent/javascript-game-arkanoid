@@ -318,10 +318,10 @@ class Player {
 class Ball {
     constructor() {
         this.radius = 10;
-        this.x = player.x + this.radius;
+        this.x = player.x + player.width / 2;
         this.y = player.y - this.radius;
-        this.vx = -2;
-        this.vy = -3.5;
+        this.vx = Math.random() + 1;
+        this.vy = -(Math.random() + 3);
         this.isDead = false;
     }
 
@@ -341,17 +341,8 @@ class Ball {
         return this._y;
     }
 
-    get mass() {
-        let density = 1;
-        return density * Math.PI * this.radius * this.radius;
-    }
-
-    get v() {
-        return [this.vx, this.vy];
-    }
-
-    set isDead(boolean) {
-        this._isDead = boolean;
+    set isDead(v) {
+        this._isDead = v;
     }
 
     get isDead() {
@@ -370,21 +361,18 @@ class Ball {
         layers.dynamicDrawRequest = true;
     }
 
-    reflectVertical() {
-        this.vy = -this.vy;
-    }
-
-    reflectHorizontal() {
-        this.vx = -this.vx;
-    }
-
     touchDown() {
         if (this.x - this.radius > player.x && this.x + this.radius < player.x + player.width) {
             if (this.y + this.radius > player.y && !this.isDead) {
-                this.reflectVertical();
+                this.reflectFromPlayer();
                 Sound.reflect();
             }
         }
+    }
+
+    reflectFromPlayer() {
+        this.vx = this.vx - ((player.x + player.width / 2) - this.x) / 15;
+        this.vy = -this.vy;
     }
 
     wallReflect() {
@@ -402,6 +390,14 @@ class Ball {
             this.vx = 0;
             this.vy = 0;
         }
+    }
+
+    reflectVertical() {
+        this.vy = -this.vy;
+    }
+
+    reflectHorizontal() {
+        this.vx = -this.vx;
     }
 }
 
