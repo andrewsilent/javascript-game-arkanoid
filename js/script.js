@@ -308,7 +308,16 @@ class Player {
     constructor() {
         this.width = settings.playerWidth;
         this.height = settings.playerHeight;
+        this.x = settings.levelX + settings.levelWidth / 2 - this.width / 2;
         this.y = settings.levelY + settings.levelHeight - settings.levelGutter * 4 - this.height;
+    }
+
+    set x(v) {
+        this._x = v;
+    }
+
+    get x() {
+        return this._x;
     }
 
     update() {
@@ -316,11 +325,19 @@ class Player {
     }
 
     movement() {
-        let CANVAS_X = Math.round(layers.static.getBoundingClientRect().left);
-        if (settings.mouseX !== this.x + CANVAS_X + this.width / 2 && player.x > settings.levelX && player.x + player.width < settings.levelX + settings.levelWidth) {
+        if ((settings.isLevelLoaded && !settings.isLevelStarted) || (settings.isLevelStarted && !settings.isLevelPaused)) {
+            this.x = settings.mouseX - settings.levelOffsetX - this.width / 2;
+        }
+        if (settings.isLevelStarted && !settings.isLevelPaused) {
+            this.x = settings.mouseX - settings.levelOffsetX - this.width / 2;
+        }
+        if (settings.isLevelPaused) {
+            this.x = this.x;
+            layers.dynamicDrawRequest = false;
+        }
+        if (settings.mouseX !== this.x + settings.levelOffsetX + this.width / 2) {
             layers.dynamicDrawRequest = true;
         }
-        this.x = settings.mouseX - CANVAS_X - this.width / 2 || settings.levelX + (settings.levelWidth / 2) - this.width / 2;
         if (player.x < settings.levelX) {
             player.x = settings.levelX;
         }
@@ -334,9 +351,9 @@ class Ball {
     constructor() {
         this.radius = settings.ballRadius;
         this.x = player.x + player.width / 2;
-        this.y = player.y - this.radius;
-        this.vx = Math.random() + 1;
-        this.vy = -(Math.random() + 3);
+        this.y = player.y - this.radius - 3;
+        this.vx = 0;
+        this.vy = 0;
         this.isDead = false;
     }
 
@@ -371,13 +388,23 @@ class Ball {
     }
 
     movement() {
-        this.x = this.x + this.vx;
-        this.y = this.y + this.vy;
-        layers.dynamicDrawRequest = true;
+        if (settings.isLevelLoaded && !settings.isLevelStarted) {
+            this.x = player.x + player.width / 2;
+            this.y = player.y - this.radius - 3;
+            layers.dynamicDrawRequest = true;
+        }
+        if (settings.isLevelStarted && !settings.isLevelPaused) {
+            this.x = this.x + this.vx;
+            this.y = this.y + this.vy;
+            layers.dynamicDrawRequest = true;
+        }
+        if (settings.isLevelPaused) {
+            layers.dynamicDrawRequest = false;
+        }
     }
 
     touchDown() {
-        if (this.x - this.radius > player.x && this.x + this.radius < player.x + player.width) {
+        if (this.x + this.radius > player.x && this.x - this.radius < player.x + player.width) {
             if (this.y + this.radius > player.y && !this.isDead) {
                 level.strike = 0;
                 this.reflectFromPlayer();
@@ -402,9 +429,8 @@ class Ball {
         }
         if (this.y - this.radius > settings.levelY + settings.levelHeight && !this.isDead) {
             this.isDead = true;
+            this.stopMovement();
             Sound.lost();
-            this.vx = 0;
-            this.vy = 0;
         }
     }
 
@@ -414,6 +440,16 @@ class Ball {
 
     reflectHorizontal() {
         this.vx = -this.vx;
+    }
+
+    startMovement() {
+        this.vx = Math.random() + 1;
+        this.vy = -(Math.random() + 3);
+    }
+
+    stopMovement() {
+        this.vx = 0;
+        this.vy = 0;
     }
 }
 
@@ -597,6 +633,16 @@ function renderBall(canvas) {
 }
 
 function controls() {
+    document.onclick = function () {
+        settings.isLevelLoaded = true;
+        document.querySelector('body').style.cursor = 'none';
+        document.addEventListener('click', () => {
+            if (settings.isLevelLoaded && !settings.isLevelStarted) {
+                settings.isLevelStarted = true;
+                ball.startMovement();
+            }
+        });
+    }
     document.onmousemove = function (e) {
         settings.mouseX = e.clientX;
     }
@@ -608,7 +654,8 @@ function controls() {
         let isEscape = false;
         isEscape = (e.key === settings.keyPause);
         if (isEscape) {
-            alert("Pause");
+            document.querySelector('body').style.cursor === 'none' ? document.querySelector('body').style.cursor = 'default' : document.querySelector('body').style.cursor = 'none';
+            settings.isLevelPaused = !settings.isLevelPaused;
         }
     }
 }
