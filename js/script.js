@@ -10,6 +10,9 @@ class Settings {
         this.brickWidth = Math.round(((this.levelWidth - this.levelGutter) / 10) - this.brickGutter);
         this.brickHeight = Math.round(this.levelHeight / 28 - this.brickGutter);
         this.brickColorScheme = [["transparent", "transparent", "transparent", "transparent"], ["#017374", "#2B898A", "#015859", "#000000"], ["#2E5873", "#3D7699", "#1F3B4D", "#000000"]];
+        this.playerWidth = Math.round(this.levelWidth / 7);
+        this.playerHeight = Math.round(this.levelHeight / 35);
+        this.ballRadius = 10;
         this.isLevelLoaded = false;
         this.isLevelStarted = false;
         this.isLevelPaused = false;
@@ -303,9 +306,8 @@ class Brick extends BrickProto {
 
 class Player {
     constructor() {
-        this.width = 120;
-        this.height = 22;
-        this.x = settings.levelX + (settings.levelWidth / 2) - this.width / 2;
+        this.width = settings.playerWidth;
+        this.height = settings.playerHeight;
         this.y = settings.levelY + settings.levelHeight - settings.levelGutter * 4 - this.height;
     }
 
@@ -330,7 +332,7 @@ class Player {
 
 class Ball {
     constructor() {
-        this.radius = 10;
+        this.radius = settings.ballRadius;
         this.x = player.x + player.width / 2;
         this.y = player.y - this.radius;
         this.vx = Math.random() + 1;
