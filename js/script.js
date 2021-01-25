@@ -1,13 +1,11 @@
 class Settings {
-    constructor(maxWidth = document.documentElement.clientWidth > 936 ? 936 : document.documentElement.clientWidth, maxHeight = document.documentElement.clientHeight > 768 ? 768 : document.documentElement.clientHeight) {
-        this.maxWidth = maxWidth;
-        this.maxHeight = maxHeight;
-        this.levelHeight = maxHeight;
-        this.levelWidth = Math.round(maxWidth * 0.9);
-        this.levelInfo = Math.round(maxWidth * 0.1);
-        this.levelGutter = 2;
+    constructor() {
+        this.levelWidth = document.documentElement.clientWidth > 842 ? 842 : document.documentElement.clientWidth;
+        this.levelHeight = document.documentElement.clientHeight > 768 ? 768 : document.documentElement.clientHeight;
+        this.levelOffsetX = document.querySelector('.static').getBoundingClientRect().left;
         this.levelX = 0;
         this.levelY = 0;
+        this.levelGutter = 2;
         this.brickGutter = 2;
         this.brickWidth = Math.round(((this.levelWidth - this.levelGutter) / 10) - this.brickGutter);
         this.brickHeight = Math.round(this.levelHeight / 28 - this.brickGutter);
@@ -44,11 +42,8 @@ class Sound {
 class Layers {
     constructor() {
         this.static = null;
-        this.regular = null;
         this.dynamic = null;
-        this.info = null;
         this.staticDrawRequest = true;
-        this.regularDrawRequest = true;
         this.dynamicDrawRequest = true;
     }
 
@@ -62,16 +57,6 @@ class Layers {
         return this._static;
     }
 
-    set regular(v) {
-        this._regular = document.querySelector('.regular');
-        this._regular.width = settings.levelWidth;
-        this._regular.height = settings.levelHeight;
-    }
-
-    get regular() {
-        return this._regular;
-    }
-
     set dynamic(v) {
         this._dynamic = document.querySelector('.dynamic');
         this._dynamic.width = settings.levelWidth;
@@ -82,28 +67,12 @@ class Layers {
         return this._dynamic;
     }
 
-    set info(v) {
-        this._info = document.querySelector('.info');
-    }
-
-    get info() {
-        return this._info;
-    }
-
     set staticDrawRequest(v) {
         this._staticDrawRequest = v;
     }
 
     get staticDrawRequest() {
         return this._staticDrawRequest;
-    }
-
-    set regularDrawRequest(v) {
-        this._regularDrawRequest = v;
-    }
-
-    get regularDrawRequest() {
-        return this._regularDrawRequest;
     }
 
     set dynamicDrawRequest(v) {
@@ -119,14 +88,14 @@ class Layers {
     }
 
     redrawIfNeed() {
-        if (this.regularDrawRequest) {
-            renderBricks(this._regular);
-            this.regularDrawRequest = false;
-        }
         if (this.dynamicDrawRequest) {
             renderBall(this._dynamic);
             renderPlayer(this._dynamic);
             this.dynamicDrawRequest = false;
+        }
+        if (this.staticDrawRequest) {
+            renderBricks(this._static);
+            this.staticDrawRequest = false;
         }
     }
 }
@@ -137,11 +106,11 @@ class Level {
         this.y = settings.levelY;
         this.bricks = [];
         this.strike = 0;
-        this.levelField = document.querySelector('.level span');
+        this.levelField = document.querySelector('.info .level');
         this.level = level;
-        this.scoreField = document.querySelector('.score span');
+        this.scoreField = document.querySelector('.info .score');
         this.score = 0;
-        this.totalField = document.querySelector('.total span');
+        this.totalField = document.querySelector('.info .total');
         this.total = 0;
     }
 
@@ -271,7 +240,7 @@ class Brick extends BrickProto {
     }
 
     set colorScheme(v) {
-        this._colorScheme = v || settings.brickColorScheme[this.strength];
+        this._colorScheme = settings.brickColorScheme[this.strength];
     }
 
     get colorScheme() {
@@ -327,7 +296,7 @@ class Brick extends BrickProto {
         this.strength -= 1;
         this.colorScheme = settings.brickColorScheme[this.strength];
         level.updateInfo();
-        layers.regularDrawRequest = true;
+        layers.staticDrawRequest = true;
         Sound.hit();
     }
 }
@@ -642,40 +611,7 @@ function controls() {
     }
 }
 
-function addHTML() {
-    document.body.appendChild(document.createElement('div')).classList.add('wrapper');
-    document.querySelector('.wrapper').appendChild(document.createElement('div')).classList.add('container');
-    const container = document.querySelector('.container');
-    container.setAttribute('style', `display: flex; width: 100%; height: 100%; max-width: 1024px; max-height: 768px;`);
-    container.appendChild(document.createElement('canvas')).classList.add('static');
-    document.querySelector('.static').setAttribute('style', 'display: block; background-color: rgba(200,200,200,0.75)');
-    container.appendChild(document.createElement('canvas')).classList.add('regular');
-    document.querySelector('.regular').setAttribute('style', 'position: absolute; top: 0; left: 0');
-    container.appendChild(document.createElement('canvas')).classList.add('dynamic');
-    document.querySelector('.dynamic').setAttribute('style', 'position: absolute; top: 0; left: 0');
-    container.appendChild(document.createElement('div')).classList.add('info');
-    const info = document.querySelector('.info');
-    info.setAttribute('style', 'display: block; width: 100%; background-color: rgba(31, 59, 77, 0.5); color: #EEE; margin-left: 10px; font: 400 1rem/1.5 Arial, sans-serif; text-align: right; padding: 20px');
-    const lvl = info.appendChild(document.createElement('p'));
-    lvl.classList.add('level');
-    lvl.textContent = 'Level';
-    const spanlvl = lvl.appendChild(document.createElement('span'));
-    spanlvl.setAttribute('style', 'display: block; font: 400 2rem/1.5 Arial, sans-serif; margin-bottom: 20px');
-    const score = info.appendChild(document.createElement('p'));
-    score.classList.add('score');
-    score.textContent = 'Score';
-    const spanscore = score.appendChild(document.createElement('span'));
-    spanscore.setAttribute('style', 'display: block; font: 400 2rem/1.5 Arial, sans-serif; margin-bottom: 20px');
-    const total = info.appendChild(document.createElement('p'));
-    total.classList.add('total');
-    total.textContent = 'Total score';
-    const spantotal = total.appendChild(document.createElement('span'));
-    spantotal.setAttribute('style', 'display: block; font: 400 2rem/1.5 Arial, sans-serif; margin-bottom: 20px');
-
-}
-
 function init() {
-    addHTML();
     settings = new Settings();
     layers = new Layers();
     level = new Level();
